@@ -3,6 +3,7 @@ package string_service
 import (
 	"context"
 	"errors"
+	"micro_server/ch7-rpc/pb"
 	"strings"
 
 	"github.com/go-kit/kit/endpoint"
@@ -12,6 +13,26 @@ import (
 type StringEndpoints struct {
 	StringEndpoint      endpoint.Endpoint
 	HealthCheckEndpoint endpoint.Endpoint
+}
+
+func (ue StringEndpoints) Concat(ctx context.Context, a string, b string) (string, error) {
+	//ctx := context.Background()
+	resp, err := ue.StringEndpoint(ctx, &pb.StringRequest{
+		A: a,
+		B: b,
+	})
+	response := resp.(*pb.StringResponse)
+	return response.Ret, err
+}
+
+func (ue StringEndpoints) Diff(ctx context.Context, a string, b string) (string, error) {
+	//ctx := context.Background()
+	resp, err := ue.StringEndpoint(ctx, pb.StringRequest{
+		A: a,
+		B: b,
+	})
+	response := resp.(*pb.StringResponse)
+	return response.Ret, err
 }
 
 var (
