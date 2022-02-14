@@ -88,7 +88,7 @@ func (s UseStringService) UseStringService(operationType, a, b string) (string, 
 	return operationResult, err
 }
 
-// 服务健康状态检查
+// HealthCheck 服务健康状态检查
 func (s UseStringService) HealthCheck() bool {
 	return true
 }

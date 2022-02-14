@@ -1,56 +1,38 @@
-package string_service
+package endpoint
 
 import (
 	"context"
 	"errors"
-	"micro_server/ch7-rpc/pb"
-	"strings"
-
 	"github.com/go-kit/kit/endpoint"
+	"micro_server/ch10-resiliency/string-service/service"
+	"strings"
 )
 
-// StringEndpoints CalculateEndpoint define endpoint
+// CalculateEndpoint define endpoint
 type StringEndpoints struct {
 	StringEndpoint      endpoint.Endpoint
 	HealthCheckEndpoint endpoint.Endpoint
-}
-
-func (ue StringEndpoints) Concat(ctx context.Context, a string, b string) (string, error) {
-	//ctx := context.Background()
-	resp, err := ue.StringEndpoint(ctx, &pb.StringRequest{
-		A: a,
-		B: b,
-	})
-	response := resp.(*pb.StringResponse)
-	return response.Ret, err
-}
-
-func (ue StringEndpoints) Diff(ctx context.Context, a string, b string) (string, error) {
-	//ctx := context.Background()
-	resp, err := ue.StringEndpoint(ctx, pb.StringRequest{
-		A: a,
-		B: b,
-	})
-	response := resp.(*pb.StringResponse)
-	return response.Ret, err
 }
 
 var (
 	ErrInvalidRequestType = errors.New("RequestType has only two type: Concat, Diff")
 )
 
+// StringRequest define request struct
 type StringRequest struct {
 	RequestType string `json:"request_type"`
 	A           string `json:"a"`
 	B           string `json:"b"`
 }
 
+// StringResponse define response struct
 type StringResponse struct {
 	Result string `json:"result"`
 	Error  error  `json:"error"`
 }
 
-func MakeStringEndpoint(svc Service) endpoint.Endpoint {
+// MakeStringEndpoint make endpoint
+func MakeStringEndpoint(svc service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(StringRequest)
 
@@ -58,16 +40,18 @@ func MakeStringEndpoint(svc Service) endpoint.Endpoint {
 			res, a, b string
 			opError   error
 		)
+
 		a = req.A
 		b = req.B
-
+		// 根据请求操作类型请求具体的操作方法
 		if strings.EqualFold(req.RequestType, "Concat") {
-			res, _ = svc.Concat(ctx, a, b)
+			res, _ = svc.Concat(a, b)
 		} else if strings.EqualFold(req.RequestType, "Diff") {
-			res, _ = svc.Diff(ctx, a, b)
+			res, _ = svc.Diff(a, b)
 		} else {
 			return nil, ErrInvalidRequestType
 		}
+
 		return StringResponse{Result: res, Error: opError}, nil
 	}
 }
@@ -81,9 +65,9 @@ type HealthResponse struct {
 }
 
 // MakeHealthCheckEndpoint 创建健康检查Endpoint
-func MakeHealthCheckEndpoint(svc Service) endpoint.Endpoint {
+func MakeHealthCheckEndpoint(svc service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		status := true
+		status := svc.HealthCheck()
 		return HealthResponse{status}, nil
 	}
 }

@@ -2,24 +2,23 @@ package client
 
 import (
 	"context"
-	"github.com/longjoy/micro-go-book/ch13-seckill/pb"
-	"github.com/longjoy/micro-go-book/ch13-seckill/pkg/discover"
-	"github.com/longjoy/micro-go-book/ch13-seckill/pkg/loadbalance"
 	"github.com/opentracing/opentracing-go"
+	"micro_server/ch13-seckill/pb"
+	"micro_server/ch13-seckill/pkg/discover"
+	"micro_server/ch13-seckill/pkg/loadbalance"
 )
 
-
-// 如果要给一个类定义方法， 请用接口， 如果要给一个类定义属性， 请用结构体覆盖这个类
+// OAuthClient 如果要给一个类定义方法， 请用接口， 如果要给一个类定义属性， 请用结构体覆盖这个类
 type OAuthClient interface {
 	// todo context, context.Context, opertracing-go, opertracing.Tracer
 	CheckToken(ctx context.Context, tracer opentracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error)
 }
 
 type OauthClientImpl struct {
-	manager ClientManager
+	manager     ClientManager
 	serviceName string
 	loadBalance loadbalance.LoadBalance
-	tracer opertracing.Tracer
+	tracer      opertracing.Tracer
 }
 
 func (impl *OauthClientImpl) CheckToken(ctx context.Context, tracer opertracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error) {
@@ -39,15 +38,15 @@ func NewOAuthClient(serviceName string, lb loadBalance.LoadBalance, tracer opert
 		lb = defaultLoadBalance
 	}
 
-	return &OauthClientImpl {
+	return &OauthClientImpl{
 		manager: &defaultClienManager{
-			serviceName: serviceName,
-			loadBalance: lb,
+			serviceName:     serviceName,
+			loadBalance:     lb,
 			discoveryClient: discover.ConsulService,
-			loggerL discover.Logger,
+			logger:          discover.Logger,
 		},
 		serviceName: serviceName,
 		loadBalance: lb,
-		tracer: tracer,
+		tracer:      tracer,
 	}, nil
 }
