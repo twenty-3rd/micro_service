@@ -2,9 +2,9 @@ package setup
 
 import (
 	"fmt"
-	conf "github.com/longjoy/micro-go-book/ch13-seckill/pkg/config"
 	"github.com/samuel/go-zookeeper/zk"
 	"log"
+	conf "micro_server/ch13-seckill/pkg/config"
 	"testing"
 	"time"
 )

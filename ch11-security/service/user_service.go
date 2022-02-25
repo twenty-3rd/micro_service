@@ -6,28 +6,25 @@ import (
 	"micro_server/ch11-security/model"
 )
 
-// Service Define a service interface
-type UserDetailsService interface {
-	// Get UserDetails By username
-	GetUserDetailByUsername(ctx context.Context, username, password string) (*model.UserDetails, error)
-}
-
 var (
 	ErrUserNotExist = errors.New("username is not exist")
 	ErrPassword     = errors.New("invalid password")
 )
 
-//UserService implement Service interface
+// UserDetailsService Service Define a service interface
+type UserDetailsService interface {
+	// GetUserDetailByUsername Get UserDetails By username
+	GetUserDetailByUsername(ctx context.Context, username, password string) (*model.UserDetails, error)
+}
+
+// InMemoryUserDetailsService UserService implement Service interface
 type InMemoryUserDetailsService struct {
 	userDetailsDict map[string]*model.UserDetails
 }
 
 func (service *InMemoryUserDetailsService) GetUserDetailByUsername(ctx context.Context, username, password string) (*model.UserDetails, error) {
-
-	// 根据 username 获取用户信息
 	userDetails, ok := service.userDetailsDict[username]
 	if ok {
-		// 比较 password 是否匹配
 		if userDetails.Password == password {
 			return userDetails, nil
 		} else {

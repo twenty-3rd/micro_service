@@ -3,7 +3,6 @@ package model
 import "time"
 
 type OAuth2Token struct {
-
 	// 刷新令牌
 	RefreshToken *OAuth2Token
 	// 令牌类型

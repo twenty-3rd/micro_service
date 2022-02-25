@@ -11,7 +11,7 @@ var (
 	ErrClientSecret   = errors.New("invalid clientSecret")
 )
 
-// Service Define a service interface
+// ClientDetailsService Service Define a service interface
 type ClientDetailsService interface {
 	GetClientDetailByClientId(ctx context.Context, clientId string, clientSecret string) (*model.ClientDetails, error)
 }

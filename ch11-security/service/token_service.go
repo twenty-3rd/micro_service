@@ -3,13 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/dgrijalva/jwt-go"
+	uuid "github.com/satori/go.uuid"
 	. "micro_server/ch11-security/model"
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/dgrijalva/jwt-go"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -84,7 +83,6 @@ func (tokenGranter *UsernamePasswordTokenGranter) Grant(ctx context.Context,
 		Client: client,
 		User:   userDetails,
 	})
-
 }
 
 type RefreshTokenGranter struct {
@@ -111,7 +109,6 @@ func (tokenGranter *RefreshTokenGranter) Grant(ctx context.Context, grantType st
 	}
 
 	return tokenGranter.tokenService.RefreshAccessToken(refreshTokenValue)
-
 }
 
 type TokenService interface {
@@ -137,6 +134,23 @@ func NewTokenService(tokenStore TokenStore, tokenEnhancer TokenEnhancer) TokenSe
 		tokenStore:    tokenStore,
 		tokenEnhancer: tokenEnhancer,
 	}
+}
+
+func (tokenService *DefaultTokenService) createAccessToken(refreshToken *OAuth2Token, oauth2Details *OAuth2Details) (*OAuth2Token, error) {
+
+	validitySeconds := oauth2Details.Client.AccessTokenValiditySeconds
+	s, _ := time.ParseDuration(strconv.Itoa(validitySeconds) + "s")
+	expiredTime := time.Now().Add(s)
+	accessToken := &OAuth2Token{
+		RefreshToken: refreshToken,
+		ExpiresTime:  &expiredTime,
+		TokenValue:   uuid.NewV4().String(),
+	}
+
+	if tokenService.tokenEnhancer != nil {
+		return tokenService.tokenEnhancer.Enhance(accessToken, oauth2Details)
+	}
+	return accessToken, nil
 }
 
 func (tokenService *DefaultTokenService) CreateAccessToken(oauth2Details *OAuth2Details) (*OAuth2Token, error) {
@@ -173,24 +187,6 @@ func (tokenService *DefaultTokenService) CreateAccessToken(oauth2Details *OAuth2
 		tokenService.tokenStore.StoreRefreshToken(refreshToken, oauth2Details)
 	}
 	return accessToken, err
-
-}
-
-func (tokenService *DefaultTokenService) createAccessToken(refreshToken *OAuth2Token, oauth2Details *OAuth2Details) (*OAuth2Token, error) {
-
-	validitySeconds := oauth2Details.Client.AccessTokenValiditySeconds
-	s, _ := time.ParseDuration(strconv.Itoa(validitySeconds) + "s")
-	expiredTime := time.Now().Add(s)
-	accessToken := &OAuth2Token{
-		RefreshToken: refreshToken,
-		ExpiresTime:  &expiredTime,
-		TokenValue:   uuid.NewV4().String(),
-	}
-
-	if tokenService.tokenEnhancer != nil {
-		return tokenService.tokenEnhancer.Enhance(accessToken, oauth2Details)
-	}
-	return accessToken, nil
 }
 
 func (tokenService *DefaultTokenService) createRefreshToken(oauth2Details *OAuth2Details) (*OAuth2Token, error) {
@@ -238,15 +234,6 @@ func (tokenService *DefaultTokenService) RefreshAccessToken(refreshTokenValue st
 		}
 	}
 	return nil, err
-
-}
-
-func (tokenService *DefaultTokenService) GetAccessToken(details *OAuth2Details) (*OAuth2Token, error) {
-	return tokenService.tokenStore.GetAccessToken(details)
-}
-
-func (tokenService *DefaultTokenService) ReadAccessToken(tokenValue string) (*OAuth2Token, error) {
-	return tokenService.tokenStore.ReadAccessToken(tokenValue)
 }
 
 func (tokenService *DefaultTokenService) GetOAuth2DetailsByAccessToken(tokenValue string) (*OAuth2Details, error) {
@@ -261,9 +248,16 @@ func (tokenService *DefaultTokenService) GetOAuth2DetailsByAccessToken(tokenValu
 	return nil, err
 }
 
-type TokenStore interface {
+func (tokenService *DefaultTokenService) GetAccessToken(details *OAuth2Details) (*OAuth2Token, error) {
+	return tokenService.tokenStore.GetAccessToken(details)
+}
 
-	// 存储访问令牌
+func (tokenService *DefaultTokenService) ReadAccessToken(tokenValue string) (*OAuth2Token, error) {
+	return tokenService.tokenStore.ReadAccessToken(tokenValue)
+}
+
+type TokenStore interface {
+	// StoreAccessToken 存储访问令牌
 	StoreAccessToken(oauth2Token *OAuth2Token, oauth2Details *OAuth2Details)
 	// 根据令牌值获取访问令牌结构体
 	ReadAccessToken(tokenValue string) (*OAuth2Token, error)
@@ -287,7 +281,6 @@ func NewJwtTokenStore(jwtTokenEnhancer *JwtTokenEnhancer) TokenStore {
 	return &JwtTokenStore{
 		jwtTokenEnhancer: jwtTokenEnhancer,
 	}
-
 }
 
 type JwtTokenStore struct {
@@ -323,7 +316,6 @@ func (tokenStore *JwtTokenStore) RemoveAccessToken(tokenValue string) {
 
 // 存储刷新令牌
 func (tokenStore *JwtTokenStore) StoreRefreshToken(oauth2Token *OAuth2Token, oauth2Details *OAuth2Details) {
-
 }
 
 // 移除存储的刷新令牌
@@ -365,7 +357,6 @@ func NewJwtTokenEnhancer(secretKey string) TokenEnhancer {
 	return &JwtTokenEnhancer{
 		secretKey: []byte(secretKey),
 	}
-
 }
 
 func (enhancer *JwtTokenEnhancer) Enhance(oauth2Token *OAuth2Token, oauth2Details *OAuth2Details) (*OAuth2Token, error) {
@@ -373,7 +364,6 @@ func (enhancer *JwtTokenEnhancer) Enhance(oauth2Token *OAuth2Token, oauth2Detail
 }
 
 func (enhancer *JwtTokenEnhancer) Extract(tokenValue string) (*OAuth2Token, *OAuth2Details, error) {
-
 	token, err := jwt.ParseWithClaims(tokenValue, &OAuth2TokenCustomClaims{}, func(token *jwt.Token) (i interface{}, e error) {
 		return enhancer.secretKey, nil
 	})
@@ -394,7 +384,6 @@ func (enhancer *JwtTokenEnhancer) Extract(tokenValue string) (*OAuth2Token, *OAu
 
 	}
 	return nil, nil, err
-
 }
 
 func (enhancer *JwtTokenEnhancer) sign(oauth2Token *OAuth2Token, oauth2Details *OAuth2Details) (*OAuth2Token, error) {

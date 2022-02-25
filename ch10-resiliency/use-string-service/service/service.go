@@ -31,10 +31,19 @@ var (
 	ErrHystrixFallbackExecute = errors.New("hystrix fall back execute")
 )
 
+// Service Define a service interface
+type Service interface {
+	// 远程调用 string-service 服务
+	UseStringService(operationType, a, b string) (string, error)
+
+	// 健康检查
+	HealthCheck() bool
+}
+
 func NewUseStringService(client discover.DiscoveryClient, lb loadbalance.LoadBalance) Service {
 	hystrix.ConfigureCommand(StringServiceCommandName, hystrix.CommandConfig{
 		// 触发最低阈值为5
-		RequestVloumeThreshold: 5,
+		RequestVolumeThreshold: 5,
 	})
 	return &UseStringService{
 		discoveryClient: client,
@@ -49,43 +58,69 @@ type StringResponse struct {
 
 func (s UseStringService) UseStringService(operationType, a, b string) (string, error) {
 	var operationResult string
-	err := hystrix.Do(StringServiceCommandName, func() error {
-		instances := s.discoveryClient.DiscoveryServices(StringService, config.Logger)
-		instanceList := make([]*api.AgentService, len(instances))
-		for i := 0; i < len(instances); i++ {
-			instanceList[i] = instances[i].(*api.AgentService)
-		}
-		// 选取实例
-		selectInstance, err := s.loadbalance.SelectService(instanceList)
-		if err != nil {
-			config.Logger.Println(err.Error())
-			return err
-		}
+	var err error
+	instances := s.discoveryClient.DiscoverServices(StringService, config.Logger)
+	instanceList := make([]*api.AgentService, len(instances))
+	for i := 0; i < len(instances); i++ {
+		instanceList[i] = instances[i].(*api.AgentService)
+	}
+	selectInstance, err := s.loadbalance.SelectService(instanceList);
+	if err == nil {
+		config.Logger.Printf("current string-service ID i %s and address:port is %s:%s\n", selectInstance.ID, selectInstance.Address, strconv.Itoa(selectInstance.Port))
 		requestUrl := url.URL{
 			Scheme: "http",
 			Host:   selectInstance.Address + ":" + strconv.Itoa(selectInstance.Port),
 			Path:   "/op/" + operationType + "/" + a + "/" + b,
 		}
-		config.Logger.Printf("current string-service ID is %s and address:port is %s:%s\n", selectInstance.ID, selectInstance.Address, strconv.Itoa(selectInstance.Port))
+
 		resp, err := http.Post(requestUrl.String(), "", nil)
-		if err != nil {
-			return err
+		if err == nil {
+			result := &StringResponse{}
+			err = json.NewDecoder(resp.Body).Decode(result)
+			if err == nil && result.Error == nil {
+				operationResult = result.Result
+			}
 		}
-		result := &StringResponse{}
+	}
 
-		err = json.NewDecoder(resp.Body).Decode(result)
-		if err != nil {
-			return err
-		} else if result.Error != nil {
-			return result.Error
-		}
-
-		operationResult = result.Result
-		return nil
-	}, func(e error) error {
-		return ErrHystrixFallbackExecute
-	})
 	return operationResult, err
+	//err := hystrix.Do(StringServiceCommandName, func() error {
+	//	instances := s.discoveryClient.DiscoverServices(StringService, config.Logger)
+	//	instanceList := make([]*api.AgentService, len(instances))
+	//	for i := 0; i < len(instances); i++ {
+	//		instanceList[i] = instances[i].(*api.AgentService)
+	//	}
+	//	// 选取实例
+	//	selectInstance, err := s.loadbalance.SelectService(instanceList)
+	//	if err != nil {
+	//		config.Logger.Println(err.Error())
+	//		return err
+	//	}
+	//	requestUrl := url.URL{
+	//		Scheme: "http",
+	//		Host:   selectInstance.Address + ":" + strconv.Itoa(selectInstance.Port),
+	//		Path:   "/op/" + operationType + "/" + a + "/" + b,
+	//	}
+	//	config.Logger.Printf("current string-service ID is %s and address:port is %s:%s\n", selectInstance.ID, selectInstance.Address, strconv.Itoa(selectInstance.Port))
+	//	resp, err := http.Post(requestUrl.String(), "", nil)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	result := &StringResponse{}
+	//
+	//	err = json.NewDecoder(resp.Body).Decode(result)
+	//	if err != nil {
+	//		return err
+	//	} else if result.Error != nil {
+	//		return result.Error
+	//	}
+	//
+	//	operationResult = result.Result
+	//	return nil
+	//}, func(e error) error {
+	//	return ErrHystrixFallbackExecute
+	//})
+	//return operationResult, err
 }
 
 // HealthCheck 服务健康状态检查
