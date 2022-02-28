@@ -1,5 +1,3 @@
-// +build go1.7
-
 package svc2
 
 import (

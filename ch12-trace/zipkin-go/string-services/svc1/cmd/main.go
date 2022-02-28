@@ -1,23 +1,25 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"micro_server/ch12-trace/zipkin-go/string-services/svc1"
+	"micro_server/ch12-trace/zipkin-go/string-services/svc2"
+	"net/http"
 	"os"
 
 	"github.com/opentracing/opentracing-go"
 
 	zipkin "github.com/openzipkin-contrib/zipkin-go-opentracing"
 	//"github.com/openzipkin-contrib/zipkin-go-opentracing/examples/string-services/svc1"
+	//"github.com/openzipkin-contrib/zipkin-go-opentracing/examples/string-services/svc2"
 )
 
 const (
 	// Our service name.
-	serviceName = "client"
+	serviceName = "svc1"
 
 	// Host + port of our service.
-	hostPort = "0.0.0.0:0"
+	hostPort = "127.0.0.1:61001"
 
 	// Endpoint to send Zipkin spans to.
 	zipkinHTTPEndpoint = "http://127.0.0.1:9411/api/v2/spans"
@@ -25,8 +27,8 @@ const (
 	// Debug mode.
 	debug = false
 
-	// Base endpoint of our SVC1 service.
-	svc1Endpoint = "http://localhost:61001"
+	// Base endpoint of our SVC2 service.
+	svc2Endpoint = "http://localhost:61002"
 
 	// same span can be set to true for RPC style spans (Zipkin V1) vs Node style (OpenTracing)
 	sameSpan = true
@@ -35,22 +37,21 @@ const (
 	traceID128Bit = true
 )
 
-//ci
+//svc1
 func main() {
-	// Create our HTTP collector.
+	// create collector.
 	collector, err := zipkin.NewHTTPCollector(zipkinHTTPEndpoint)
 	if err != nil {
 		fmt.Printf("unable to create Zipkin HTTP collector: %+v\n", err)
 		os.Exit(-1)
 	}
 
-	// Create our recorder.
+	// create recorder.
 	recorder := zipkin.NewRecorder(collector, debug, hostPort, serviceName)
 
-	// Create our tracer.
+	// create tracer.
 	tracer, err := zipkin.NewTracer(
 		recorder,
-		zipkin.ClientServerSameSpan(sameSpan),
 		zipkin.TraceID128Bit(traceID128Bit),
 	)
 	if err != nil {
@@ -58,31 +59,19 @@ func main() {
 		os.Exit(-1)
 	}
 
-	// Explicitly set our tracer to be the default tracer.
+	// explicitly set our tracer to be the default tracer.
 	opentracing.InitGlobalTracer(tracer)
 
-	// Create Client to svc1 Service
-	client := svc1.NewHTTPClient(tracer, svc1Endpoint)
+	// create the client to svc2
+	svc2Client := svc2.NewHTTPClient(tracer, svc2Endpoint)
 
-	// Create Root Span for duration of the interaction with svc1
-	span := opentracing.StartSpan("Run")
+	// create the service implementation
+	service := svc1.NewService(svc2Client)
 
-	// Put root span in context so it will be used in our calls to the client.
-	ctx := opentracing.ContextWithSpan(context.Background(), span)
+	// create the HTTP Server Handler for the service
+	handler := svc1.NewHTTPHandler(tracer, service)
 
-	// Call the Concat Method
-	span.LogEvent("Call Concat")
-	res1, err := client.Concat(ctx, "Hello", " World!")
-	fmt.Printf("Concat: %s Err: %+v\n", res1, err)
-
-	// Call the Sum Method
-	span.LogEvent("Call Sum")
-	res2, err := client.Sum(ctx, 10, 20)
-	fmt.Printf("Sum: %d Err: %+v\n", res2, err)
-
-	// Finish our CLI span
-	span.Finish()
-
-	// Close collector to ensure spans are sent before exiting.
-	collector.Close()
+	// start the service
+	fmt.Printf("Starting %s on %s\n", serviceName, hostPort)
+	http.ListenAndServe(hostPort, handler)
 }

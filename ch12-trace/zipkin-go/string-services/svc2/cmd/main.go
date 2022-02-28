@@ -1,10 +1,8 @@
-// +build go1.7
-
 package main
 
 import (
 	"fmt"
-	"github.com/longjoy/micro-go-book/ch12-trace/zipkin-go/string-services/svc2"
+	"micro_server/ch12-trace/zipkin-go/string-services/svc2"
 	"net/http"
 	"os"
 
@@ -22,7 +20,7 @@ const (
 	hostPort = "127.0.0.1:61002"
 
 	// Endpoint to send Zipkin spans to.
-	zipkinHTTPEndpoint = "http://114.67.98.210:9411/api/v1/spans"
+	zipkinHTTPEndpoint = "http://127.0.0.1:9411/api/v2/spans"
 
 	// Debug mode.
 	debug = false
