@@ -7,11 +7,6 @@ import (
 	"micro_server/ch13-seckill/pkg/common"
 )
 
-/*
-1.接口
-2.
-*/
-
 type LoadBalance interface {
 	SelectService(service []*common.ServiceInstance) (*common.ServiceInstance, error)
 }
@@ -19,19 +14,18 @@ type LoadBalance interface {
 type RandomLoadBalance struct {
 }
 
-// 随机负载均衡
+// SelectService 随机负载均衡
 func (LoadBalance *RandomLoadBalance) SelectService(services []*common.ServiceInstance) (*common.ServiceInstance, error) {
 	if services == nil || len(services) == 0 {
 		return nil, errors.New("服务实例不存在")
 	}
-	// todo rand, rand.Intn
 	return services[rand.Intn(len(services))], nil
 }
 
 type WeightRoundRobinLoadBalance struct {
 }
 
-// 权重平滑负载均衡
+// SelectService 权重平滑负载均衡
 func (LoadBalance *WeightRoundRobinLoadBalance) SelectService(services []*common.ServiceInstance) (best *common.ServiceInstance, err error) {
 	if services == nil || len(services) == 0 {
 		return nil, errors.New("服务实例不存在")

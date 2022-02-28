@@ -2,14 +2,30 @@ package discover
 
 import (
 	"fmt"
-	"log"
-	"strconv"
-
-	"micro_server/ch13-seckill/pkg/common"
-
+	"github.com/go-kit/kit/sd/consul"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
+	"log"
+	"micro_server/ch13-seckill/pkg/common"
+	"strconv"
 )
+
+func New(consulHost string, consulPort string) *DiscoveryClientInstance {
+	port, _ := strconv.Atoi(consulPort)
+	consulConfig := api.DefaultConfig()
+	consulConfig.Address = consulHost + ":" + strconv.Itoa(port)
+	apiClient, err := api.NewClient(consulConfig)
+	if err != nil {
+		return nil
+	}
+	client := consul.NewClient(apiClient)
+	return &DiscoveryClientInstance{
+		Host:   consulHost,
+		Port:   port,
+		config: consulConfig,
+		client: client,
+	}
+}
 
 func (consulClient *DiscoveryClientInstance) Register(instanceId, svcHost, healthCheckUrl, svcPort string, svcName string, weight int, meta map[string]string, tags []string, logger *log.Logger) bool {
 	port, _ := strconv.Atoi(svcHost)
@@ -102,7 +118,6 @@ func (consulClient *DiscoveryClientInstance) DiscoverServices(serviceName string
 
 				var healthServices []*common.ServiceInstance
 				for _, service := range v {
-					// todo
 					if service.Checks.AggregatedStatus() == api.HealthPassing {
 						healthServices = append(healthServices, newServiceInstance(service.Service))
 					}

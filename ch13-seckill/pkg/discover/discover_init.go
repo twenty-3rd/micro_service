@@ -1,19 +1,88 @@
 package discover
 
 import (
+	"errors"
+	"fmt"
+	uuid "github.com/satori/go.uuid"
+	"log"
 	"micro_server/ch13-seckill/pkg/bootstrap"
+	"micro_server/ch13-seckill/pkg/common"
+	"micro_server/ch13-seckill/pkg/loadbalance"
+	"net/http"
+	"os"
 )
 
 var ConsulService DiscoveryClient
+var LoadBalance loadbalance.LoadBalance
+var Logger *log.Logger
+var NoInstanceExistedErr = errors.New("no available client")
+
+func init() {
+	// 1.实例化一个 Consul 客户端，此处实例化了原生态实现版本
+	ConsulService = New(bootstrap.DiscoverConfig.Host, bootstrap.DiscoverConfig.Port)
+	LoadBalance = new(loadbalance.RandomLoadBalance)
+	Logger = log.New(os.Stderr, "", log.LstdFlags)
+
+}
+
+func CheckHealth(writer http.ResponseWriter, reader *http.Request) {
+	Logger.Println("Health Check!")
+	_, err := fmt.Fprintln(writer, "Server is ok!")
+	if err != nil {
+		Logger.Printf("health check err:%s\n", err)
+	}
+}
+
+func DiscoveryService(serviceName string) (*common.ServiceInstance, error) {
+	instances := ConsulService.DiscoverServices(serviceName, Logger)
+
+	if len(instances) < 1 {
+		Logger.Printf("no available client for %s.", serviceName)
+		return nil, NoInstanceExistedErr
+	}
+	return LoadBalance.SelectService(instances)
+}
 
 func Register() {
-	// 实例创建失败，直接停止服务
+	//// 实例失败，停止服务
 	if ConsulService == nil {
 		panic(0)
 	}
 
-	instanceId := bootstrap.DiscoveryConfig.InstanceId
-	if instanceId == "" {
+	//判空 instanceId,通过 go.uuid 获取一个服务实例ID
+	instanceId := bootstrap.DiscoverConfig.InstanceId
 
+	if instanceId == "" {
+		instanceId = bootstrap.DiscoverConfig.ServiceName + uuid.NewV4().String()
+	}
+
+	if !ConsulService.Register(instanceId, bootstrap.HttpConfig.Host, "/health",
+		bootstrap.HttpConfig.Port, bootstrap.DiscoverConfig.ServiceName,
+		bootstrap.DiscoverConfig.Weight,
+		map[string]string{
+			"rpcPort": bootstrap.RpcConfig.Port,
+		}, nil, Logger) {
+		Logger.Printf("register service %s failed.", bootstrap.DiscoverConfig.ServiceName)
+		// 注册失败，服务启动失败
+		panic(0)
+	}
+	Logger.Printf(bootstrap.DiscoverConfig.ServiceName+"-service for service %s success.", bootstrap.DiscoverConfig.ServiceName)
+
+}
+
+func Deregister() {
+	//// 实例失败，停止服务
+	if ConsulService == nil {
+		panic(0)
+	}
+	//判空 instanceId,通过 go.uuid 获取一个服务实例ID
+	instanceId := bootstrap.DiscoverConfig.InstanceId
+
+	if instanceId == "" {
+		instanceId = bootstrap.DiscoverConfig.ServiceName + "-" + uuid.NewV4().String()
+	}
+	if !ConsulService.DeRegister(instanceId, Logger) {
+		Logger.Printf("deregister for service %s failed.", bootstrap.DiscoverConfig.ServiceName)
+		panic(0)
 	}
 }

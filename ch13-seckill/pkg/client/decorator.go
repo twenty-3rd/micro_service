@@ -6,15 +6,18 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/opentracing/opentracing-go"
+	zipkin "github.com/openzipkin-contrib/zipkin-go-opentracing"
 	"google.golang.org/grpc"
 	"log"
+	"micro_server/ch13-seckill/pkg/bootstrap"
+	conf "micro_server/ch13-seckill/pkg/config"
 	"micro_server/ch13-seckill/pkg/discover"
 	"micro_server/ch13-seckill/pkg/loadbalance"
 	"strconv"
 	"time"
 )
 
-var ErrPRCService = errors.New("没有rpc服务")
+var ErrRPCService = errors.New("没有rpc服务")
 
 var defaultLoadBalance loadbalance.LoadBalance = &loadbalance.RandomLoadBalance{}
 
@@ -80,4 +83,26 @@ func (manager *DefaultClientManager) DecoratorInvoke(path string, hystrixName st
 		}
 		return nil
 	}
+}
+
+func genTracer(tracer opentracing.Tracer) opentracing.Tracer {
+	if tracer != nil {
+		return tracer
+	}
+	zipkinUrl := "http://" + conf.TraceConfig.Host + ":" + conf.TraceConfig.Port + conf.TraceConfig.Url
+	zipkinRecorder := bootstrap.HttpConfig.Host + ":" + bootstrap.HttpConfig.Port
+	collector, err := zipkin.NewHTTPCollector(zipkinUrl)
+	if err != nil {
+		log.Fatalf("zipkin.NewHTTPCollector err: %v", err)
+	}
+
+	recorder := zipkin.NewRecorder(collector, false, zipkinRecorder, bootstrap.DiscoverConfig.ServiceName)
+
+	res, err := zipkin.NewTracer(
+		recorder, zipkin.ClientServerSameSpan(true),
+	)
+	if err != nil {
+		log.Fatalf("zipkin.NewTracer err: %v", err)
+	}
+	return res
 }

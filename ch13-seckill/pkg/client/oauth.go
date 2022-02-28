@@ -10,7 +10,6 @@ import (
 
 // OAuthClient 如果要给一个类定义方法， 请用接口， 如果要给一个类定义属性， 请用结构体覆盖这个类
 type OAuthClient interface {
-	// todo context, context.Context, opertracing-go, opertracing.Tracer
 	CheckToken(ctx context.Context, tracer opentracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error)
 }
 
