@@ -13,14 +13,14 @@ type OAuthClient interface {
 	CheckToken(ctx context.Context, tracer opentracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error)
 }
 
-type OauthClientImpl struct {
+type OAuthClientImpl struct {
 	manager     ClientManager
 	serviceName string
 	loadBalance loadbalance.LoadBalance
-	tracer      opertracing.Tracer
+	tracer      opentracing.Tracer
 }
 
-func (impl *OauthClientImpl) CheckToken(ctx context.Context, tracer opertracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error) {
+func (impl *OAuthClientImpl) CheckToken(ctx context.Context, tracer opentracing.Tracer, request *pb.CheckTokenRequest) (*pb.CheckTokenResponse, error) {
 	response := new(pb.CheckTokenResponse) // 复制并获取引用
 	if err := impl.manager.DecoratorInvoke("/pb.OauthService/CheckToken", "token_check", tracer, ctx, request, response); err == nil {
 		return response, nil
@@ -29,7 +29,7 @@ func (impl *OauthClientImpl) CheckToken(ctx context.Context, tracer opertracing.
 	}
 }
 
-func NewOAuthClient(serviceName string, lb loadBalance.LoadBalance, tracer opertracing.Tracer) (OAuthClient, error) {
+func NewOAuthClient(serviceName string, lb loadbalance.LoadBalance, tracer opentracing.Tracer) (OAuthClient, error) {
 	if serviceName == "" {
 		serviceName = "Oauth"
 	}
@@ -37,8 +37,8 @@ func NewOAuthClient(serviceName string, lb loadBalance.LoadBalance, tracer opert
 		lb = defaultLoadBalance
 	}
 
-	return &OauthClientImpl{
-		manager: &defaultClienManager{
+	return &OAuthClientImpl{
+		manager: &DefaultClientManager{
 			serviceName:     serviceName,
 			loadBalance:     lb,
 			discoveryClient: discover.ConsulService,
